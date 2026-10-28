@@ -154,12 +154,17 @@ async function fetchKorean(word) {
   return { summary: await fetchMachineTranslation(word), byPos: {}, auto: true };
 }
 
+// 문서 하나가 실패해도(없는 문서, 일시 오류) 다른 문서의 번역은 쓸 수 있게 빈 값을 돌려준다.
 async function fetchWikitext(page) {
-  const url = WIKI_URL + "?action=parse&prop=wikitext&format=json&formatversion=2&origin=*&page=" + encodeURIComponent(page);
-  const res = await fetch(url);
-  if (!res.ok) return "";
-  const data = await res.json();
-  return (data.parse && data.parse.wikitext) || ""; // 없는 문서면 빈 값
+  try {
+    const url = WIKI_URL + "?action=parse&prop=wikitext&format=json&formatversion=2&origin=*&page=" + encodeURIComponent(page);
+    const res = await fetch(url);
+    if (!res.ok) return "";
+    const data = await res.json();
+    return (data.parse && data.parse.wikitext) || ""; // 없는 문서면 빈 값
+  } catch {
+    return "";
+  }
 }
 
 // 위키 문서의 English 부분에서 품사별 번역표의 "* Korean: {{t+|ko|단어}}" 줄을 찾는다.
@@ -325,6 +330,39 @@ function renderResult(info) {
   resultEl.hidden = false;
 }
 
+// 단어장 목록에서는 한국어 뜻을 가려 두고, 눌렀을 때만 보여 준다 (외웠는지 스스로 확인하도록).
+const revealed = new Set();
+
+function toggleReveal(word) {
+  if (revealed.has(word)) revealed.delete(word);
+  else {
+    revealed.add(word);
+    refreshOldKorean(word);
+  }
+  renderList();
+}
+
+// 한국어 뜻 개선 전에 저장했거나 자동 번역으로만 저장된 단어(예: happy → 행복해요)는
+// 펼칠 때 위키낱말사전에서 다시 받아 본다. 한 번 열어 둔 화면에서는 단어당 한 번만 시도한다.
+const refreshTried = new Set();
+
+async function refreshOldKorean(word) {
+  const w = loadWords().find((x) => x.word === word);
+  if (!w || refreshTried.has(word) || (w.koreanByPos && !w.koreanAuto)) return;
+  refreshTried.add(word);
+  const korean = await fetchKorean(word);
+  if (!korean.summary || korean.auto) return; // 위키 번역을 못 받으면 기존 뜻 유지
+  const words = loadWords();
+  const target = words.find((x) => x.word === word);
+  if (!target) return;
+  target.korean = korean.summary;
+  target.koreanByPos = korean.byPos;
+  target.koreanAuto = korean.auto;
+  saveWords(words);
+  syncSave(target);
+  renderList();
+}
+
 function renderList() {
   const words = sortWords(loadWords());
   countEl.textContent = words.length ? "(" + words.length + "개)" : "";
@@ -341,9 +379,21 @@ function renderList() {
         {},
         el(
           "div",
-          { class: "info", title: "눌러서 자세히 보기", onclick: () => showSaved(w) },
+          { class: "info", title: "눌러서 뜻 보기", onclick: () => toggleReveal(w.word) },
           el("div", { class: "w" }, w.word + (w.phonetic ? "  " + w.phonetic : "")),
-          el("div", { class: "k" }, w.korean || ""),
+          revealed.has(w.word)
+            ? el(
+                "div",
+                { class: "k" },
+                w.korean || "(한국어 뜻 없음)",
+                " ",
+                el(
+                  "a",
+                  { href: "#result", class: "more", onclick: (e) => (e.stopPropagation(), e.preventDefault(), showSaved(w)) },
+                  "자세히 ›"
+                )
+              )
+            : el("div", { class: "k hidden-meaning" }, "뜻 보기 👆"),
           w.checks ? el("div", { class: "count" }, "외웠어요 " + w.checks + "번") : null
         ),
         el("button", { class: "ghost", type: "button", onclick: () => speak(w.word, w.audio) }, "🔊"),
@@ -404,6 +454,7 @@ function checkWord(word) {
   if (!w) return;
   w.checks += 1;
   w.lastChecked = Date.now();
+  revealed.delete(word); // 다음에 다시 볼 때는 뜻이 가려진 상태로
   saveWords(words);
   syncSave(w);
   renderList();

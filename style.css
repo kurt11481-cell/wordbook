@@ -149,5 +149,7 @@ button.ghost {
 #word-list .info { flex: 1; min-width: 0; cursor: pointer; }
 #word-list .w { font-weight: 700; }
 #word-list .k { color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+#word-list .hidden-meaning { color: var(--accent); }
+#word-list .more { color: var(--accent); font-size: 0.85rem; white-space: nowrap; }
 #word-list .count { font-size: 0.8rem; color: var(--muted); }
 #word-list button { padding: 6px 10px; font-size: 0.85rem; }
