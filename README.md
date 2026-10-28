@@ -36,7 +36,9 @@
 ## 사용 기술과 배포
 
 - 기본 웹 기술(HTML·CSS·JavaScript)만 사용, 설치할 도구 없음
-- 배포: GitHub Pages (무료, 아직 안 함)
+- 배포: GitHub Pages (무료) → https://kurt11481-cell.github.io/wordbook/
+  - 저장소: https://github.com/kurt11481-cell/wordbook (공개)
+  - 고친 내용을 반영하려면 커밋 후 `git push`. 1~2분 뒤 링크에 반영된다.
 
 ## 우선순위 규칙
 
