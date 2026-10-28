@@ -1,9 +1,10 @@
 // 영어 단어장
 // - 영어 정보: Free Dictionary API (무료, 가입 없음)
-// - 한국어 뜻: MyMemory 번역 API (무료, 품질은 확인 필요)
+// - 한국어 뜻: 위키낱말사전(Wiktionary) 번역표. 없으면 MyMemory 자동 번역으로 대신한다.
 // - 단어장은 이 기기의 브라우저(localStorage)에만 저장된다.
 
 const DICT_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/";
+const WIKI_URL = "https://en.wiktionary.org/w/api.php";
 const TRANSLATE_URL = "https://api.mymemory.translated.net/get";
 const STORAGE_KEY = "wordbook.v1";
 
@@ -56,8 +57,21 @@ function sortWords(words) {
 
 // ---------- 사전 조회 ----------
 
+// 무료 사전 서버가 가끔 실패해서, 연결 오류나 서버 오류(5xx)면 두 번까지 다시 시도한다.
+async function fetchWithRetry(url, tries = 3) {
+  for (let i = 1; ; i++) {
+    try {
+      const res = await fetch(url);
+      if (res.status < 500 || i >= tries) return res;
+    } catch (err) {
+      if (i >= tries) throw err;
+    }
+    await new Promise((r) => setTimeout(r, 800 * i));
+  }
+}
+
 async function fetchDictionary(word) {
-  const res = await fetch(DICT_URL + encodeURIComponent(word));
+  const res = await fetchWithRetry(DICT_URL + encodeURIComponent(word));
   if (res.status === 404) return null;
   if (!res.ok) throw new Error("사전 서버 오류 (" + res.status + ")");
   const entries = await res.json();
@@ -96,7 +110,82 @@ async function fetchDictionary(word) {
   return { word: entries[0].word || word, phonetic, audio, meanings };
 }
 
+// 한국어 뜻 결과: { summary: "달리다, 뛰다, …", byPos: { verb: [{ gloss, words }] }, auto: 자동번역 여부 }
 async function fetchKorean(word) {
+  try {
+    const [main, sub] = await Promise.all([fetchWikitext(word), fetchWikitext(word + "/translations")]);
+    const rows = parseKoreanTranslations(main + "\n" + sub);
+    if (rows.length) {
+      const byPos = {};
+      for (const r of rows) {
+        const list = (byPos[r.pos] = byPos[r.pos] || []);
+        // 같은 한국어 뜻이 여러 번 나오면 한 줄로 합친다 (예: quick → 빠르다 ×3)
+        const same = list.find((x) => x.words.join() === r.words.join());
+        if (same) same.gloss = [same.gloss, r.gloss].filter(Boolean).join("; ");
+        else list.push({ gloss: r.gloss, words: r.words });
+      }
+      const summary = [...new Set(rows.flatMap((r) => r.words))].slice(0, 5).join(", ");
+      return { summary, byPos, auto: false };
+    }
+  } catch {
+    // 위키낱말사전이 안 되면 아래 자동 번역으로 넘어간다.
+  }
+  return { summary: await fetchMachineTranslation(word), byPos: {}, auto: true };
+}
+
+async function fetchWikitext(page) {
+  const url = WIKI_URL + "?action=parse&prop=wikitext&format=json&formatversion=2&origin=*&page=" + encodeURIComponent(page);
+  const res = await fetch(url);
+  if (!res.ok) return "";
+  const data = await res.json();
+  return (data.parse && data.parse.wikitext) || ""; // 없는 문서면 빈 값
+}
+
+// 위키 문서의 English 부분에서 품사별 번역표의 "* Korean: {{t+|ko|단어}}" 줄을 찾는다.
+function parseKoreanTranslations(text) {
+  const rows = [];
+  let inEnglish = false;
+  let pos = "";
+  let gloss = "";
+  for (const line of text.split("\n")) {
+    const lang = line.match(/^==\s*([^=]+?)\s*==\s*$/);
+    if (lang) {
+      inEnglish = lang[1] === "English";
+      continue;
+    }
+    if (!inEnglish) continue;
+
+    const heading = line.match(/^={3,5}\s*([A-Za-z ]+?)\s*={3,5}/);
+    if (heading && POS_KO[heading[1].toLowerCase()]) {
+      pos = heading[1].toLowerCase();
+      continue;
+    }
+
+    // {{trans-top|뜻 설명}}: 이어지는 번역이 어떤 뜻인지
+    const top = line.match(/\{\{trans-top(-see)?\|([^}]*)\}\}/);
+    if (top) {
+      gloss = top[1] ? "" : top[2].split("|").filter((p) => !p.includes("=")).pop() || "";
+      continue;
+    }
+
+    if (pos && /^\*\s*Korean:/.test(line)) {
+      const words = [...line.matchAll(/\{\{tt?\+?\|ko\|([^|}]+)/g)].map((m) => cleanKorean(m[1])).filter(Boolean);
+      if (words.length) rows.push({ pos, gloss, words: [...new Set(words)] });
+    }
+  }
+  return rows;
+}
+
+// "[[불]][[켜다]]" → "불켜다", "문제(問題)" → "문제"
+function cleanKorean(s) {
+  return s
+    .replace(/\]\]\[\[-?/g, "")
+    .replace(/\[\[|\]\]/g, "")
+    .replace(/\([^)]*\)/g, "")
+    .trim();
+}
+
+async function fetchMachineTranslation(word) {
   try {
     const url = TRANSLATE_URL + "?q=" + encodeURIComponent(word) + "&langpair=en|ko";
     const res = await fetch(url);
@@ -152,6 +241,18 @@ function chips(label, items, anti) {
   );
 }
 
+// 품사별 한국어 뜻 (뜻이 여러 개면 영어 설명을 옆에 작게 붙인다)
+function koreanRows(rows) {
+  if (!rows || !rows.length) return null;
+  return el(
+    "ul",
+    { class: "ko-list" },
+    ...rows.slice(0, 5).map((r) =>
+      el("li", {}, r.words.join(", "), r.gloss ? el("span", { class: "muted small" }, "  " + r.gloss) : null)
+    )
+  );
+}
+
 function renderResult(info) {
   const saved = loadWords().some((w) => w.word === info.word);
 
@@ -165,12 +266,20 @@ function renderResult(info) {
       info.phonetic ? el("span", { class: "phonetic" }, info.phonetic) : null,
       el("button", { class: "ghost", type: "button", onclick: () => speak(info.word, info.audio) }, "🔊 발음 듣기")
     ),
-    info.korean ? el("p", { class: "korean" }, "한국어: " + info.korean) : null,
+    info.korean
+      ? el(
+          "p",
+          { class: "korean" },
+          "한국어: " + info.korean,
+          info.koreanAuto ? el("span", { class: "muted small" }, " (자동 번역, 부정확할 수 있어요)") : null
+        )
+      : null,
     ...info.meanings.map((m) =>
       el(
         "div",
         { class: "pos" },
         el("span", { class: "pos-name" }, (POS_KO[m.name] || m.name) + " (" + m.name + ")"),
+        koreanRows((info.koreanByPos || {})[m.name]),
         el(
           "ol",
           {},
@@ -234,14 +343,22 @@ async function search(word) {
   resultEl.hidden = true;
 
   try {
-    const [info, korean] = await Promise.all([fetchDictionary(word), fetchKorean(word)]);
+    const [found, korean] = await Promise.all([fetchDictionary(word), fetchKorean(word)]);
+    let info = found;
+    // 영어 사전에 없어도 위키낱말사전에 한국어 뜻이 있으면 그것만이라도 보여 준다.
+    if (!info && korean.summary && !korean.auto) {
+      info = { word, phonetic: "", audio: "", meanings: [] };
+      statusEl.textContent = "영어 사전에는 없어서 한국어 뜻만 보여 드려요.";
+    }
     if (!info) {
       statusEl.textContent = "'" + word + "'을(를) 사전에서 찾지 못했어요. 철자를 확인해 주세요.";
       return;
     }
-    info.korean = korean;
+    info.korean = korean.summary;
+    info.koreanByPos = korean.byPos;
+    info.koreanAuto = korean.auto;
     current = info;
-    statusEl.textContent = "";
+    if (found) statusEl.textContent = "";
     renderResult(info);
   } catch (err) {
     statusEl.textContent = "인터넷 연결 또는 사전 서버 문제로 찾지 못했어요. (" + err.message + ")";

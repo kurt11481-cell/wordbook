@@ -105,6 +105,9 @@ button.ghost {
 }
 
 .pos ol { padding-left: 20px; margin: 6px 0; }
+.ko-list { list-style: none; padding: 0; margin: 6px 0; }
+.ko-list li { font-weight: 600; }
+.ko-list .small { font-weight: normal; }
 .example { color: var(--muted); font-style: italic; }
 
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
