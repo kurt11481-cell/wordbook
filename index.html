@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>영어 단어장</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <h1>영어 단어장</h1>
+
+    <form id="search-form">
+      <input id="word-input" type="text" placeholder="모르는 영어 단어 입력" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+      <button type="submit">찾기</button>
+    </form>
+
+    <p id="status" class="status"></p>
+
+    <!-- 검색 결과 -->
+    <section id="result" hidden></section>
+
+    <!-- 내 단어장 -->
+    <section>
+      <h2>내 단어장 <span id="word-count" class="muted"></span></h2>
+      <p class="muted small">✔ 외웠어요를 누르면 그 단어는 목록 뒤로 밀려나요.</p>
+      <ul id="word-list"></ul>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
