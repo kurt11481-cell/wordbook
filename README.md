@@ -19,7 +19,7 @@
 | 앱 종류 | 웹 앱 (설치 없이 링크로 사용) |
 | 사용 대상 | 소수 지인 |
 | 목적 | 영어 단어장 |
-| 저장 방식 | 각자 자기 휴대폰·PC(브라우저)에 저장, 로그인 없음 |
+| 저장 방식 | 구글 로그인하면 계정에 저장되어 휴대폰·PC 공유 (2026-10-28 변경). 로그인 안 하면 그 기기에만 저장 |
 | 한국어 뜻 | 영어 정보와 함께 한국어 뜻도 표시 |
 
 ## 단어 정보 출처 (후보, 2026-10-28 "happy"로 시험)
@@ -39,6 +39,16 @@
 - 배포: GitHub Pages (무료) → https://kurt11481-cell.github.io/wordbook/
   - 저장소: https://github.com/kurt11481-cell/wordbook (공개)
   - 고친 내용을 반영하려면 커밋 후 `git push`. 1~2분 뒤 링크에 반영된다.
+
+## 휴대폰·PC 공유 (Firebase)
+
+- Firebase 프로젝트: English Wordbook (`english-wordbook-e1f1f`), 무료 Spark 요금제
+  - Authentication: Google 로그인 사용, 승인된 도메인에 `kurt11481-cell.github.io` 추가
+  - Firestore: Standard, 서울(asia-northeast3), 보안 규칙은 `firestore.rules` 내용을 콘솔에 붙여넣어 게시
+- 저장 위치: `users/{구글 계정 uid}/words/{단어}`. 각자 자기 단어장만 읽고 쓸 수 있다.
+- 처음 로그인하면 그 기기에만 있던 단어를 계정으로 올린다. 같은 단어는 "외웠어요" 횟수가 많은 쪽을 남긴다.
+- 로그아웃하면 그 기기의 사본을 지운다. 다시 로그인하면 계정에서 돌아온다.
+- 설정값은 `firebase-config.js`. 비밀값이 아니며 데이터 보호는 보안 규칙이 맡는다.
 
 ## 우선순위 규칙
 
@@ -60,6 +70,9 @@ python -m http.server 8123
 ├─ index.html    화면 뼈대
 ├─ style.css     디자인
 ├─ app.js        동작 (사전 조회, 단어장 저장, 우선순위)
+├─ sync.js       구글 로그인·계정 단어장 공유
+├─ firebase-config.js  Firebase 프로젝트 설정
+├─ firestore.rules     Firestore 보안 규칙 (콘솔에 붙여넣는 원본)
 ├─ README.md     이 문서
 ├─ CLAUDE.md     Claude 작업 규칙
 └─ .gitignore    git에 올리지 않을 파일 목록
