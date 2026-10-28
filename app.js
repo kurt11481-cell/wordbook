@@ -1,7 +1,8 @@
 // 영어 단어장
 // - 영어 정보: Free Dictionary API (무료, 가입 없음)
 // - 한국어 뜻: 위키낱말사전(Wiktionary) 번역표. 없으면 MyMemory 자동 번역으로 대신한다.
-// - 단어장은 이 기기의 브라우저(localStorage)에만 저장된다.
+// - 단어장은 이 기기의 브라우저(localStorage)에 저장되고,
+//   구글 로그인하면 sync.js가 계정(Firestore)과 맞춰 휴대폰·PC에서 공유한다.
 
 const DICT_URL = "https://api.dictionaryapi.dev/api/v2/entries/en/";
 const WIKI_URL = "https://en.wiktionary.org/w/api.php";
@@ -45,6 +46,26 @@ function saveWords(words) {
   } catch {
     statusEl.textContent = "이 브라우저에서는 단어장을 저장할 수 없어요.";
   }
+}
+
+// 로그인 중이면 계정 단어장에도 반영한다 (sync.js가 window.wordSync를 채움).
+function syncSave(w) {
+  if (window.wordSync) window.wordSync.save(w).catch(syncFailed);
+}
+
+function syncRemove(word) {
+  if (window.wordSync) window.wordSync.remove(word).catch(syncFailed);
+}
+
+function syncFailed(err) {
+  statusEl.textContent = "계정 단어장에 저장하지 못했어요 (" + (err.code || err.message) + ")";
+}
+
+// 계정 단어장이 바뀌면 sync.js가 불러서 이 기기 사본을 통째로 바꾼다.
+function replaceLocalWords(words) {
+  saveWords(words);
+  renderList();
+  if (current) renderResult(current);
 }
 
 // 우선순위: 체크(외웠어요) 횟수가 적은 단어가 위로.
@@ -368,8 +389,10 @@ async function search(word) {
 function addWord(info) {
   const words = loadWords();
   if (!words.some((w) => w.word === info.word)) {
-    words.push({ ...info, checks: 0, lastChecked: 0, addedAt: Date.now() });
+    const w = { ...info, checks: 0, lastChecked: 0, addedAt: Date.now() };
+    words.push(w);
     saveWords(words);
+    syncSave(w);
   }
   renderResult(info);
   renderList();
@@ -382,12 +405,14 @@ function checkWord(word) {
   w.checks += 1;
   w.lastChecked = Date.now();
   saveWords(words);
+  syncSave(w);
   renderList();
 }
 
 function removeWord(word) {
   if (!confirm("'" + word + "'을(를) 단어장에서 지울까요?")) return;
   saveWords(loadWords().filter((w) => w.word !== word));
+  syncRemove(word);
   renderList();
   if (current && current.word === word) renderResult(current);
 }
