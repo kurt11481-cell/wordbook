@@ -223,6 +223,45 @@ async function fetchMachineTranslation(word) {
   }
 }
 
+// 품사별 영어 뜻풀이를 한국어로 자동 번역해 각 뜻풀이에 d.ko로 붙인다.
+// 품사마다 뜻풀이를 줄바꿈으로 묶어 한 번에 번역한다 (MyMemory는 한 번에 500자까지).
+async function translateDefinitions(info) {
+  const jobs = [];
+  for (const m of info.meanings) {
+    const todo = m.defs.filter((d) => !d.ko);
+    let chunk = [];
+    let len = 0;
+    for (const d of todo) {
+      if (chunk.length && len + d.text.length + 1 > 450) {
+        jobs.push(chunk);
+        chunk = [];
+        len = 0;
+      }
+      chunk.push(d);
+      len += d.text.length + 1;
+    }
+    if (chunk.length) jobs.push(chunk);
+  }
+  if (!jobs.length) return false;
+
+  const results = await Promise.all(
+    jobs.map((chunk) => fetchMachineTranslation(chunk.map((d) => d.text.replace(/\n/g, " ")).join("\n")))
+  );
+  let changed = false;
+  results.forEach((text, i) => {
+    const lines = (text || "").split("\n").map((s) => s.trim());
+    // 줄 수가 맞을 때만 짝지어 붙인다 (번역이 줄을 합쳐 버리면 영어 그대로 둔다)
+    if (lines.length !== jobs[i].length) return;
+    jobs[i].forEach((d, j) => {
+      if (lines[j]) {
+        d.ko = lines[j];
+        changed = true;
+      }
+    });
+  });
+  return changed;
+}
+
 // ---------- 발음 ----------
 
 function speak(word, audioUrl) {
@@ -267,14 +306,14 @@ function chips(label, items, anti) {
   );
 }
 
-// 품사별 한국어 뜻 (뜻이 여러 개면 영어 설명을 옆에 작게 붙인다)
+// 품사별 한국어 뜻 (뜻이 여러 개면 줄을 나눠 보여 준다)
 function koreanRows(rows) {
   if (!rows || !rows.length) return null;
   return el(
     "ul",
     { class: "ko-list" },
     ...rows.slice(0, 5).map((r) =>
-      el("li", {}, r.words.join(", "), r.gloss ? el("span", { class: "muted small" }, "  " + r.gloss) : null)
+      el("li", {}, r.words.join(", "))
     )
   );
 }
@@ -300,6 +339,9 @@ function renderResult(info) {
           info.koreanAuto ? el("span", { class: "muted small" }, " (자동 번역, 부정확할 수 있어요)") : null
         )
       : null,
+    info.meanings.some((m) => m.defs.some((d) => d.ko))
+      ? el("p", { class: "muted small" }, "뜻풀이 한국어는 자동 번역이라 어색할 수 있어요. 아래 작은 글씨가 영어 원문이에요.")
+      : null,
     ...info.meanings.map((m) =>
       el(
         "div",
@@ -310,7 +352,13 @@ function renderResult(info) {
           "ol",
           {},
           ...m.defs.map((d) =>
-            el("li", {}, d.text, d.example ? el("div", { class: "example" }, "예) " + d.example) : null)
+            el(
+              "li",
+              {},
+              d.ko || d.text,
+              d.ko ? el("div", { class: "def-en" }, d.text) : null,
+              d.example ? el("div", { class: "example" }, "예) " + d.example) : null
+            )
           )
         ),
         chips("동의어", m.synonyms, false),
@@ -431,6 +479,7 @@ async function search(word) {
     current = info;
     if (found) statusEl.textContent = "";
     renderResult(info);
+    addKoreanDefinitions(info);
   } catch (err) {
     statusEl.textContent = "인터넷 연결 또는 사전 서버 문제로 찾지 못했어요. (" + err.message + ")";
   }
@@ -474,6 +523,20 @@ function showSaved(w) {
   statusEl.textContent = "";
   renderResult(w);
   resultEl.scrollIntoView({ behavior: "smooth" });
+  addKoreanDefinitions(w); // 한국어 뜻풀이 추가 전에 저장한 단어는 이때 채운다
+}
+
+// 영어 뜻풀이를 먼저 보여 주고, 한국어 번역이 오면 화면을 다시 그린다.
+// 단어장에 있는 단어면 번역 결과도 단어장(과 계정)에 저장해 다음부터는 바로 보이게 한다.
+async function addKoreanDefinitions(info) {
+  if (!(await translateDefinitions(info))) return;
+  if (current === info) renderResult(info);
+  const words = loadWords();
+  const target = words.find((x) => x.word === info.word);
+  if (!target) return;
+  target.meanings = info.meanings;
+  saveWords(words);
+  syncSave(target);
 }
 
 form.addEventListener("submit", (e) => {

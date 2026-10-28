@@ -71,9 +71,12 @@ function renderDaily() {
         )
       )
     ),
-    dailyRevealed
-      ? el("div", { class: "daily-ko" }, "뜻: " + e.ko)
-      : el("button", { type: "button", class: "reveal", onclick: () => ((dailyRevealed = true), renderDaily()) }, "해석 보기 👆")
+    dailyRevealed ? el("div", { class: "daily-ko" }, "뜻: " + e.ko) : null,
+    el(
+      "button",
+      { type: "button", class: dailyRevealed ? "reveal ghost" : "reveal", onclick: () => ((dailyRevealed = !dailyRevealed), renderDaily()) },
+      dailyRevealed ? "해석 접기 👆" : "해석 보기 👆"
+    )
   );
 }
 
