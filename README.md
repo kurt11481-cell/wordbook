@@ -40,6 +40,13 @@
   - 저장소: https://github.com/kurt11481-cell/wordbook (공개)
   - 고친 내용을 반영하려면 커밋 후 `git push`. 1~2분 뒤 링크에 반영된다.
 
+## 오늘의 회화 표현
+
+- 단어장 위에 일상 회화 표현을 하루에 하나씩 보여 준다 (2026-10-28 추가).
+- 표현은 `expressions.js`에 직접 작성한 목록(102개: 표현·뜻·대화 예문·예문 해석). 2026-10-28이 1번, 날짜마다 다음 표현, 끝나면 처음부터.
+- 한국어 해석은 가려 두고 "해석 보기"를 눌러야 보인다. 🔊는 브라우저 음성으로 읽는다. ◀ ▶로 지난·다음 표현을 볼 수 있다.
+- 표현을 늘리려면 `expressions.js` 목록 끝에 같은 형식으로 추가한다.
+
 ## 휴대폰·PC 공유 (Firebase)
 
 - Firebase 프로젝트: English Wordbook (`english-wordbook-e1f1f`), 무료 Spark 요금제
@@ -71,6 +78,8 @@ python -m http.server 8123
 ├─ style.css     디자인
 ├─ app.js        동작 (사전 조회, 단어장 저장, 우선순위)
 ├─ sync.js       구글 로그인·계정 단어장 공유
+├─ daily.js      오늘의 회화 표현 화면
+├─ expressions.js 회화 표현 목록
 ├─ firebase-config.js  Firebase 프로젝트 설정
 ├─ firestore.rules     Firestore 보안 규칙 (콘솔에 붙여넣는 원본)
 ├─ README.md     이 문서
