@@ -43,6 +43,20 @@ h2 { font-size: 1.15rem; margin: 28px 0 4px; }
 
 form { display: flex; gap: 8px; }
 
+.daily { margin-bottom: 16px; }
+.daily-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.daily-label { font-weight: 700; color: var(--accent); }
+.daily .nav { padding: 4px 10px; }
+.daily .link { background: none; border: none; color: var(--muted); padding: 0 0 0 6px; font-size: 0.85rem; }
+.daily-en { font-size: 1.35rem; font-weight: 700; margin: 12px 0 8px; overflow-wrap: anywhere; }
+.daily-en button { padding: 4px 8px; font-size: 0.9rem; vertical-align: middle; }
+.dialogue { border-left: 3px solid var(--line); padding-left: 10px; margin: 8px 0 12px; }
+.dialogue .line { margin: 4px 0; }
+.dialogue .small { margin: 0; }
+.daily .tiny { padding: 0 6px; font-size: 0.75rem; }
+.daily-ko { font-size: 1.05rem; font-weight: 600; }
+.daily .reveal { width: 100%; }
+
 .account {
   display: flex;
   align-items: center;

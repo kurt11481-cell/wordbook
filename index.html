@@ -13,6 +13,9 @@
     <!-- 구글 로그인 / 공유 상태 (Firebase 설정이 있을 때만 보임) -->
     <div id="account" class="account" hidden></div>
 
+    <!-- 오늘의 회화 표현 -->
+    <section id="daily" class="card daily"></section>
+
     <form id="search-form">
       <input id="word-input" type="text" placeholder="모르는 영어 단어 입력" autocomplete="off" autocapitalize="off" spellcheck="false" required>
       <button type="submit">찾기</button>
@@ -31,7 +34,9 @@
     </section>
   </main>
 
+  <script src="expressions.js"></script>
   <script src="app.js"></script>
+  <script src="daily.js"></script>
   <script type="module" src="sync.js"></script>
 </body>
 </html>
